@@ -1,0 +1,22 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.code-workspace
+
+# Fabric
+run/
+logs/
+
+# macOS
+.DS_Store
+
+# Runtime
+*.log

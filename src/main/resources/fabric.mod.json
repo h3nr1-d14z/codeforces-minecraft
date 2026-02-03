@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "cfquest",
+  "version": "${version}",
+  "name": "Codeforces Quest",
+  "description": "Tích hợp Codeforces với Minecraft - Giải bài lập trình để nhận phần thưởng trong game!",
+  "authors": [
+    "HieuLD"
+  ],
+  "contact": {
+    "homepage": "https://github.com/hieuprogrammer/codeforces-minecraft",
+    "sources": "https://github.com/hieuprogrammer/codeforces-minecraft"
+  },
+  "license": "MIT",
+  "icon": "assets/cfquest/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "server": [
+      "com.hieu.cfquest.CFQuestMod"
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
