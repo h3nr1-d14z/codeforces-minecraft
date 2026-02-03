@@ -1,5 +1,6 @@
 package com.hieu.cfquest;
 
+import com.hieu.cfquest.api.CodeforcesAPI;
 import com.hieu.cfquest.api.CodeforcesPoller;
 import com.hieu.cfquest.command.CFAdminCommand;
 import com.hieu.cfquest.command.CFLinkCommand;
@@ -85,7 +86,7 @@ public class CFQuestMod implements DedicatedServerModInitializer {
     private void onServerStopping(MinecraftServer server) {
         LOGGER.info("Đang dừng Codeforces Quest Mod...");
 
-        // Stop poller and scheduler
+        // Stop poller and scheduler first
         if (codeforcesPoller != null) {
             codeforcesPoller.stop();
         }
@@ -93,15 +94,22 @@ public class CFQuestMod implements DedicatedServerModInitializer {
             questScheduler.stop();
         }
 
-        // Save data
-        if (playerDataManager != null) {
-            playerDataManager.save();
+        // Shutdown API client
+        CodeforcesAPI.shutdown();
+
+        // Save quest state
+        if (questManager != null && questManager.hasActiveQuest()) {
+            questManager.saveActiveQuest();
         }
+
+        // Save history
         if (questHistory != null) {
             questHistory.save();
         }
-        if (questManager != null && questManager.hasActiveQuest()) {
-            questManager.saveActiveQuest();
+
+        // Shutdown player data manager (handles its own save)
+        if (playerDataManager != null) {
+            playerDataManager.shutdown();
         }
 
         LOGGER.info("Codeforces Quest Mod đã dừng.");

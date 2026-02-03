@@ -19,35 +19,87 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Codeforces API client với các tối ưu:
+ * - Shared HttpClient (thread-safe, connection pooling)
+ * - Dedicated executor để không block server thread
+ * - Non-blocking rate limiting
+ * - Proper resource cleanup
+ */
 public class CodeforcesAPI {
     private static final String BASE_URL = "https://codeforces.com/api";
     private static final Gson GSON = new Gson();
+    private static final long MIN_REQUEST_INTERVAL_MS = 2000; // CF rate limit: 1 req/2s
 
-    private final HttpClient httpClient;
+    // Shared HttpClient - thread-safe, reuses connections
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .executor(Executors.newFixedThreadPool(2, r -> {
+                Thread t = new Thread(r, "CFQuest-HTTP");
+                t.setDaemon(true);
+                return t;
+            }))
+            .build();
+
+    // Dedicated executor for API calls - prevents blocking server threads
+    private static final ExecutorService API_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "CFQuest-API");
+        t.setDaemon(true);
+        return t;
+    });
+
+    // Rate limiting with atomic operations (thread-safe)
+    private static final AtomicLong lastRequestTime = new AtomicLong(0);
+    private static final Semaphore rateLimitSemaphore = new Semaphore(1);
+
     private final ModConfig config;
-    private long lastRequestTime = 0;
-    private static final long MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
+    private volatile boolean shutdown = false;
 
     public CodeforcesAPI(ModConfig config) {
         this.config = config;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
     }
 
-    private synchronized void rateLimitWait() {
-        long now = System.currentTimeMillis();
-        long elapsed = now - lastRequestTime;
-        if (elapsed < MIN_REQUEST_INTERVAL) {
+    /**
+     * Shutdown API client - call when mod unloads
+     */
+    public static void shutdown() {
+        API_EXECUTOR.shutdown();
+        try {
+            if (!API_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
+                API_EXECUTOR.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            API_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * Non-blocking rate limit wait using semaphore
+     */
+    private CompletableFuture<Void> acquireRateLimit() {
+        return CompletableFuture.runAsync(() -> {
             try {
-                Thread.sleep(MIN_REQUEST_INTERVAL - elapsed);
+                rateLimitSemaphore.acquire();
+                long now = System.currentTimeMillis();
+                long lastTime = lastRequestTime.get();
+                long waitTime = MIN_REQUEST_INTERVAL_MS - (now - lastTime);
+
+                if (waitTime > 0) {
+                    Thread.sleep(waitTime);
+                }
+                lastRequestTime.set(System.currentTimeMillis());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-        }
-        lastRequestTime = System.currentTimeMillis();
+        }, API_EXECUTOR);
+    }
+
+    private void releaseRateLimit() {
+        rateLimitSemaphore.release();
     }
 
     private String generateApiSig(String methodName, Map<String, String> params) {
@@ -55,7 +107,7 @@ public class CodeforcesAPI {
             return null;
         }
 
-        String rand = String.format("%06d", new Random().nextInt(1000000));
+        String rand = String.format("%06d", ThreadLocalRandom.current().nextInt(1000000));
         long time = System.currentTimeMillis() / 1000;
 
         TreeMap<String, String> sortedParams = new TreeMap<>(params);
@@ -117,40 +169,56 @@ public class CodeforcesAPI {
     }
 
     private CompletableFuture<JsonObject> makeRequest(String method, Map<String, String> params) {
-        return CompletableFuture.supplyAsync(() -> {
-            rateLimitWait();
+        if (shutdown) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-            String url = buildUrl(method, params);
-            CFQuestMod.LOGGER.debug("CF API Request: {}", url);
+        return acquireRateLimit()
+                .thenCompose(v -> {
+                    String url = buildUrl(method, params);
+                    CFQuestMod.LOGGER.debug("CF API Request: {}", method);
 
-            try {
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .timeout(Duration.ofSeconds(30))
-                        .GET()
-                        .build();
+                    HttpRequest request = HttpRequest.newBuilder()
+                            .uri(URI.create(url))
+                            .timeout(Duration.ofSeconds(30))
+                            .GET()
+                            .build();
 
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                    return HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                            .thenApply(response -> {
+                                releaseRateLimit();
 
-                if (response.statusCode() != 200) {
-                    CFQuestMod.LOGGER.error("CF API Error: HTTP {}", response.statusCode());
+                                if (response.statusCode() != 200) {
+                                    CFQuestMod.LOGGER.error("CF API Error: HTTP {}", response.statusCode());
+                                    return null;
+                                }
+
+                                try {
+                                    JsonObject json = GSON.fromJson(response.body(), JsonObject.class);
+
+                                    if (json == null || !json.has("status")) {
+                                        CFQuestMod.LOGGER.error("CF API Error: Invalid response");
+                                        return null;
+                                    }
+
+                                    if (!"OK".equals(json.get("status").getAsString())) {
+                                        String comment = json.has("comment") ? json.get("comment").getAsString() : "Unknown error";
+                                        CFQuestMod.LOGGER.error("CF API Error: {}", comment);
+                                        return null;
+                                    }
+
+                                    return json;
+                                } catch (Exception e) {
+                                    CFQuestMod.LOGGER.error("CF API Parse Error: {}", e.getMessage());
+                                    return null;
+                                }
+                            });
+                })
+                .exceptionally(e -> {
+                    releaseRateLimit();
+                    CFQuestMod.LOGGER.error("CF API Request failed: {}", e.getMessage());
                     return null;
-                }
-
-                JsonObject json = GSON.fromJson(response.body(), JsonObject.class);
-
-                if (!"OK".equals(json.get("status").getAsString())) {
-                    String comment = json.has("comment") ? json.get("comment").getAsString() : "Unknown error";
-                    CFQuestMod.LOGGER.error("CF API Error: {}", comment);
-                    return null;
-                }
-
-                return json;
-            } catch (Exception e) {
-                CFQuestMod.LOGGER.error("CF API Request failed: {}", e.getMessage());
-                return null;
-            }
-        });
+                });
     }
 
     public CompletableFuture<List<Submission>> getUserSubmissions(String handle, int count) {
@@ -297,6 +365,10 @@ public class CodeforcesAPI {
 
             return standings;
         });
+    }
+
+    public void markShutdown() {
+        this.shutdown = true;
     }
 
     public static class StandingsEntry {

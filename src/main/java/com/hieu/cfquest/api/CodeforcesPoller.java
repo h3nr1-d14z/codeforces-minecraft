@@ -5,6 +5,7 @@ import com.hieu.cfquest.config.ModConfig;
 import com.hieu.cfquest.quest.Quest;
 import com.hieu.cfquest.quest.QuestManager;
 import com.hieu.cfquest.storage.PlayerDataManager;
+import net.minecraft.server.MinecraftServer;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -14,11 +15,20 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Background poller cho Codeforces API.
+ *
+ * Optimizations:
+ * - Chạy trên dedicated daemon thread
+ * - Sử dụng server.execute() cho Minecraft operations
+ * - Không block server tick
+ */
 public class CodeforcesPoller {
     private final ModConfig config;
     private final QuestManager questManager;
     private final PlayerDataManager playerDataManager;
     private final CodeforcesAPI api;
+    private final MinecraftServer server;
 
     private ScheduledExecutorService executor;
     private ScheduledFuture<?> pollTask;
@@ -29,6 +39,7 @@ public class CodeforcesPoller {
         this.questManager = questManager;
         this.playerDataManager = playerDataManager;
         this.api = new CodeforcesAPI(config);
+        this.server = CFQuestMod.getInstance().getServer();
     }
 
     public void start() {
@@ -132,63 +143,65 @@ public class CodeforcesPoller {
             return;
         }
 
-        String problemIndex = quest.getProblemIndex();
+        // Process on server main thread to ensure thread-safety for Minecraft operations
+        server.execute(() -> {
+            String problemIndex = quest.getProblemIndex();
 
-        for (Map.Entry<String, String> entry : linkedPlayers.entrySet()) {
-            String playerUuid = entry.getKey();
-            String cfHandle = entry.getValue().toLowerCase();
+            for (Map.Entry<String, String> entry : linkedPlayers.entrySet()) {
+                String playerUuid = entry.getKey();
+                String cfHandle = entry.getValue().toLowerCase();
 
-            // Skip if already won
-            if (quest.hasWon(cfHandle)) {
-                continue;
-            }
+                // Skip if already won
+                if (quest.hasWon(cfHandle)) {
+                    continue;
+                }
 
-            CodeforcesAPI.StandingsEntry standingsEntry = standings.get(cfHandle);
-            if (standingsEntry == null) {
-                continue;
-            }
+                CodeforcesAPI.StandingsEntry standingsEntry = standings.get(cfHandle);
+                if (standingsEntry == null) {
+                    continue;
+                }
 
-            CodeforcesAPI.ProblemResult problemResult = standingsEntry.getProblemResult(problemIndex);
-            if (problemResult == null) {
-                continue;
-            }
+                CodeforcesAPI.ProblemResult problemResult = standingsEntry.getProblemResult(problemIndex);
+                if (problemResult == null) {
+                    continue;
+                }
 
-            // Check for new wrong answers
-            int currentWrongCount = quest.getPenaltyCount(cfHandle);
-            int newWrongCount = problemResult.rejectedAttemptCount;
+                // Check for new wrong answers
+                int currentWrongCount = quest.getPenaltyCount(cfHandle);
+                int newWrongCount = problemResult.rejectedAttemptCount;
 
-            if (newWrongCount > currentWrongCount) {
-                // New wrong answers detected
-                int newWrongs = newWrongCount - currentWrongCount;
-                quest.setPenaltyCount(cfHandle, newWrongCount);
+                if (newWrongCount > currentWrongCount) {
+                    // New wrong answers detected
+                    int newWrongs = newWrongCount - currentWrongCount;
+                    quest.setPenaltyCount(cfHandle, newWrongCount);
 
-                // Notify player about wrong answer
-                questManager.notifyWrongAnswer(playerUuid, cfHandle, newWrongs, newWrongCount);
-            }
+                    // Notify player about wrong answer
+                    questManager.notifyWrongAnswer(playerUuid, cfHandle, newWrongs, newWrongCount);
+                }
 
-            // Check if solved
-            if (problemResult.isSolved()) {
-                long solveTimeSeconds = problemResult.bestSubmissionTimeSeconds;
+                // Check if solved
+                if (problemResult.isSolved()) {
+                    long solveTimeSeconds = problemResult.bestSubmissionTimeSeconds;
 
-                // Check if this submission was made after quest started
-                long questStartTime = quest.getStartTime();
-                long submissionAbsoluteTime = questStartTime + (solveTimeSeconds * 1000);
+                    // Check if this submission was made after quest started
+                    long questStartTime = quest.getStartTime();
+                    long submissionAbsoluteTime = questStartTime + (solveTimeSeconds * 1000);
 
-                if (submissionAbsoluteTime >= questStartTime) {
-                    // Calculate penalty time
-                    int penaltyMinutes = newWrongCount * config.getQuest().getPenaltyMinutes();
-                    long totalTimeSeconds = solveTimeSeconds + (penaltyMinutes * 60L);
+                    if (submissionAbsoluteTime >= questStartTime) {
+                        // Calculate penalty time
+                        int penaltyMinutes = newWrongCount * config.getQuest().getPenaltyMinutes();
 
-                    // Record the solve
-                    int place = questManager.recordSolve(playerUuid, cfHandle, solveTimeSeconds, penaltyMinutes);
+                        // Record the solve
+                        int place = questManager.recordSolve(playerUuid, cfHandle, solveTimeSeconds, penaltyMinutes);
 
-                    if (place > 0) {
-                        CFQuestMod.LOGGER.info("Người chơi {} ({}) đã giải bài! Hạng: {}, Thời gian: {}s, Phạt: {}m",
-                                playerUuid, cfHandle, place, solveTimeSeconds, penaltyMinutes);
+                        if (place > 0) {
+                            CFQuestMod.LOGGER.info("Người chơi {} ({}) đã giải bài! Hạng: {}, Thời gian: {}s, Phạt: {}m",
+                                    playerUuid, cfHandle, place, solveTimeSeconds, penaltyMinutes);
+                        }
                     }
                 }
             }
-        }
+        });
     }
 
     public void forcePoll() {
