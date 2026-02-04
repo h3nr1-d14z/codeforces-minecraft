@@ -36,7 +36,7 @@ public class CFAdminCommand {
 
             // Check if player is opped using PlayerManager's op names
             var opList = source.getServer().getPlayerManager().getOpNames();
-            String playerName = player.getGameProfile().getName();
+            String playerName = player.getName().getString();
             for (String op : opList) {
                 if (op.equalsIgnoreCase(playerName)) {
                     return true;
