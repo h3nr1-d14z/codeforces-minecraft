@@ -34,8 +34,15 @@ public class CFAdminCommand {
                 return false;
             }
 
-            // Check operator list contains player name
-            return source.getServer().getPlayerManager().getOpList().get(player.getGameProfile()) != null;
+            // Check if player is opped using PlayerManager's op names
+            var opList = source.getServer().getPlayerManager().getOpNames();
+            String playerName = player.getGameProfile().getName();
+            for (String op : opList) {
+                if (op.equalsIgnoreCase(playerName)) {
+                    return true;
+                }
+            }
+            return false;
         } catch (Exception e) {
             // If any reflection/method error, fallback to console-only
             CFQuestMod.LOGGER.debug("Permission check failed: {}", e.getMessage());
