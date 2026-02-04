@@ -10,7 +10,6 @@ import com.hieu.cfquest.storage.PlayerDataManager;
 import com.hieu.cfquest.storage.QuestHistory;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -146,7 +145,7 @@ public class QuestManager {
 
             server.execute(() -> {
                 player.sendMessage(message, false);
-                player.playSoundToPlayer(SoundEvents.ENTITY_VILLAGER_NO, SoundCategory.PLAYERS, 1.0f, 1.0f);
+                player.playSound(SoundEvents.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             });
         }
     }
@@ -214,7 +213,7 @@ public class QuestManager {
                 player.sendMessage(header, false);
 
                 // Play sound
-                player.playSoundToPlayer(SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1.0f, 1.0f);
+                player.playSound(SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
             }
         });
     }
@@ -260,7 +259,7 @@ public class QuestManager {
         server.execute(() -> {
             for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
                 player.sendMessage(message, false);
-                player.playSoundToPlayer(SoundEvents.ENTITY_FIREWORK_ROCKET_BLAST, SoundCategory.PLAYERS, 1.0f, 1.0f);
+                player.playSound(SoundEvents.ENTITY_FIREWORK_ROCKET_BLAST, 1.0f, 1.0f);
             }
         });
     }
@@ -329,7 +328,7 @@ public class QuestManager {
                 }
 
                 player.sendMessage(header, false);
-                player.playSoundToPlayer(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.PLAYERS, 1.0f, 1.0f);
+                player.playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
             }
         });
     }

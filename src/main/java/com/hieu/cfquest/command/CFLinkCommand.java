@@ -74,12 +74,8 @@ public class CFLinkCommand {
                                     .append(Text.literal(handle)
                                             .formatted(Formatting.AQUA, Formatting.BOLD)
                                             .styled(style -> style
-                                                    .withClickEvent(new ClickEvent(
-                                                            ClickEvent.Action.OPEN_URL,
-                                                            "https://codeforces.com/profile/" + handle))
-                                                    .withHoverEvent(new HoverEvent(
-                                                            HoverEvent.Action.SHOW_TEXT,
-                                                            Text.literal("Click để xem profile")))));
+                                                    .withClickEvent(new ClickEvent.OpenUrl("https://codeforces.com/profile/" + handle))
+                                                    .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click để xem profile")))));
 
                             player.sendMessage(successMsg, false);
                         });
@@ -151,12 +147,8 @@ public class CFLinkCommand {
                     .append(Text.literal(data.getCfHandle())
                             .formatted(Formatting.AQUA, Formatting.BOLD)
                             .styled(style -> style
-                                    .withClickEvent(new ClickEvent(
-                                            ClickEvent.Action.OPEN_URL,
-                                            "https://codeforces.com/profile/" + data.getCfHandle()))
-                                    .withHoverEvent(new HoverEvent(
-                                            HoverEvent.Action.SHOW_TEXT,
-                                            Text.literal("Click để xem profile")))));
+                                    .withClickEvent(new ClickEvent.OpenUrl("https://codeforces.com/profile/" + data.getCfHandle()))
+                                    .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click để xem profile")))));
             player.sendMessage(linkStatus, false);
         } else {
             Text notLinked = Text.literal("Liên kết: ")

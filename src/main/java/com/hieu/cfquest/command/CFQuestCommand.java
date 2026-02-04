@@ -59,12 +59,8 @@ public class CFQuestCommand {
                 .append(Text.literal(quest.getProblemUrl())
                         .formatted(Formatting.BLUE, Formatting.UNDERLINE)
                         .styled(style -> style
-                                .withClickEvent(new ClickEvent(
-                                        ClickEvent.Action.OPEN_URL,
-                                        quest.getProblemUrl()))
-                                .withHoverEvent(new HoverEvent(
-                                        HoverEvent.Action.SHOW_TEXT,
-                                        Text.literal("Click để mở bài"))))), false);
+                                .withClickEvent(new ClickEvent.OpenUrl(quest.getProblemUrl()))
+                                .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click để mở bài"))))), false);
 
         // Rating
         int rating = quest.getProblemRating();
