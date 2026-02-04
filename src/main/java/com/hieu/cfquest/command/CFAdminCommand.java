@@ -15,43 +15,51 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 import java.util.Map;
-import java.util.function.Predicate;
 
 public class CFAdminCommand {
 
     /**
-     * Permission check that works across MC versions.
-     * Checks if source is console OR player with op level >= 2
+     * Check if command source has admin permission.
+     * Uses try-catch for compatibility across MC versions.
      */
-    private static final Predicate<ServerCommandSource> REQUIRE_OP = source -> {
-        // Console always has permission
-        if (!source.isExecutedByPlayer()) {
-            return true;
+    private static boolean hasAdminPermission(ServerCommandSource source) {
+        try {
+            // Console/command block always has permission
+            if (!source.isExecutedByPlayer()) {
+                return true;
+            }
+
+            ServerPlayerEntity player = source.getPlayer();
+            if (player == null) {
+                return false;
+            }
+
+            // Check using PlayerEntity's built-in method (most compatible)
+            // This checks the entity's permission level directly
+            return player.hasPermissionLevel(2);
+        } catch (Exception e) {
+            // If any reflection/method error, fallback to console-only
+            CFQuestMod.LOGGER.debug("Permission check failed: {}", e.getMessage());
+            return !source.isExecutedByPlayer();
         }
-        // Check player's op level
-        ServerPlayerEntity player = source.getPlayer();
-        if (player == null) {
-            return false;
-        }
-        return source.getServer().getPlayerManager().isOperator(player.getGameProfile());
-    };
+    }
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(
                 CommandManager.literal("cf")
                         .then(CommandManager.literal("quest")
                                 .then(CommandManager.literal("start")
-                                        .requires(REQUIRE_OP)
+                                        .requires(CFAdminCommand::hasAdminPermission)
                                         .then(CommandManager.argument("contestId", IntegerArgumentType.integer(1))
                                                 .then(CommandManager.argument("problemIndex", StringArgumentType.word())
                                                         .executes(CFAdminCommand::executeStart)
                                                         .then(CommandManager.argument("timeout", IntegerArgumentType.integer(1, 180))
                                                                 .executes(CFAdminCommand::executeStartWithTimeout)))))
                                 .then(CommandManager.literal("stop")
-                                        .requires(REQUIRE_OP)
+                                        .requires(CFAdminCommand::hasAdminPermission)
                                         .executes(CFAdminCommand::executeStop)))
                         .then(CommandManager.literal("admin")
-                                .requires(REQUIRE_OP)
+                                .requires(CFAdminCommand::hasAdminPermission)
                                 .then(CommandManager.literal("reload")
                                         .executes(CFAdminCommand::executeReload))
                                 .then(CommandManager.literal("players")
