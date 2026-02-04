@@ -76,8 +76,22 @@ public class RewardManager {
                 continue;
             }
 
-            // Calculate count based on multiplier
-            int baseCount = 1;
+            // Calculate count based on multiplier and place
+            // Base count varies by place to ensure different rewards
+            int baseCount;
+            switch (place) {
+                case 1:
+                    baseCount = 3;  // 1st place gets 3 of each item
+                    break;
+                case 2:
+                    baseCount = 2;  // 2nd place gets 2 of each item
+                    break;
+                case 3:
+                    baseCount = 1;  // 3rd place gets 1 of each item
+                    break;
+                default:
+                    baseCount = 1;
+            }
             int count = Math.max(1, (int) Math.round(baseCount * multiplier));
 
             ItemStack stack = new ItemStack(item, count);

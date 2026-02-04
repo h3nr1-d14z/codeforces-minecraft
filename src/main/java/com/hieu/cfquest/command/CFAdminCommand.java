@@ -60,7 +60,9 @@ public class CFAdminCommand {
                                                 .then(CommandManager.argument("problemIndex", StringArgumentType.word())
                                                         .executes(CFAdminCommand::executeStart)
                                                         .then(CommandManager.argument("timeout", IntegerArgumentType.integer(1, 180))
-                                                                .executes(CFAdminCommand::executeStartWithTimeout)))))
+                                                                .executes(CFAdminCommand::executeStartWithTimeout)
+                                                                .then(CommandManager.argument("rating", IntegerArgumentType.integer(800, 3500))
+                                                                        .executes(CFAdminCommand::executeStartWithRating)))))))
                                 .then(CommandManager.literal("stop")
                                         .requires(CFAdminCommand::hasAdminPermission)
                                         .executes(CFAdminCommand::executeStop)))
@@ -79,15 +81,21 @@ public class CFAdminCommand {
     }
 
     private static int executeStart(CommandContext<ServerCommandSource> context) {
-        return startQuest(context, CFQuestMod.getInstance().getConfig().getQuest().getDefaultTimeoutMinutes());
+        return startQuest(context, CFQuestMod.getInstance().getConfig().getQuest().getDefaultTimeoutMinutes(), -1);
     }
 
     private static int executeStartWithTimeout(CommandContext<ServerCommandSource> context) {
         int timeout = IntegerArgumentType.getInteger(context, "timeout");
-        return startQuest(context, timeout);
+        return startQuest(context, timeout, -1);
     }
 
-    private static int startQuest(CommandContext<ServerCommandSource> context, int timeoutMinutes) {
+    private static int executeStartWithRating(CommandContext<ServerCommandSource> context) {
+        int timeout = IntegerArgumentType.getInteger(context, "timeout");
+        int rating = IntegerArgumentType.getInteger(context, "rating");
+        return startQuest(context, timeout, rating);
+    }
+
+    private static int startQuest(CommandContext<ServerCommandSource> context, int timeoutMinutes, int overrideRating) {
         ServerCommandSource source = context.getSource();
         int contestId = IntegerArgumentType.getInteger(context, "contestId");
         String problemIndex = StringArgumentType.getString(context, "problemIndex").toUpperCase();
@@ -114,6 +122,16 @@ public class CFAdminCommand {
                     }
 
                     source.getServer().execute(() -> {
+                        // Override rating if specified (for private contests without rating)
+                        if (overrideRating > 0) {
+                            problem.setRating(overrideRating);
+                        } else if (problem.getRating() <= 0) {
+                            // Default rating if not available
+                            problem.setRating(1200);
+                            source.sendFeedback(() -> Text.literal("Bài không có rating, sử dụng mặc định: 1200")
+                                    .formatted(Formatting.YELLOW), false);
+                        }
+
                         boolean started = questManager.startQuest(contestId, problem, timeoutMinutes);
 
                         if (started) {
