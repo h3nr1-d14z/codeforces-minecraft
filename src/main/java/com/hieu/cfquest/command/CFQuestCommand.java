@@ -12,6 +12,8 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
+
+import java.net.URI;
 import net.minecraft.util.Formatting;
 
 import java.util.List;
@@ -59,7 +61,7 @@ public class CFQuestCommand {
                 .append(Text.literal(quest.getProblemUrl())
                         .formatted(Formatting.BLUE, Formatting.UNDERLINE)
                         .styled(style -> style
-                                .withClickEvent(new ClickEvent.OpenUrl(quest.getProblemUrl()))
+                                .withClickEvent(new ClickEvent.OpenUrl(URI.create(quest.getProblemUrl())))
                                 .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click để mở bài"))))), false);
 
         // Rating

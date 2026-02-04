@@ -34,9 +34,8 @@ public class CFAdminCommand {
                 return false;
             }
 
-            // Check using PlayerEntity's built-in method (most compatible)
-            // This checks the entity's permission level directly
-            return source.hasPermissionLevel(2);
+            // Check if player is operator
+            return source.getServer().getPlayerManager().isOperator(player.getGameProfile());
         } catch (Exception e) {
             // If any reflection/method error, fallback to console-only
             CFQuestMod.LOGGER.debug("Permission check failed: {}", e.getMessage());

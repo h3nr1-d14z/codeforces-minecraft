@@ -11,6 +11,8 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
+
+import java.net.URI;
 import net.minecraft.util.Formatting;
 
 public class CFLinkCommand {
@@ -74,7 +76,7 @@ public class CFLinkCommand {
                                     .append(Text.literal(handle)
                                             .formatted(Formatting.AQUA, Formatting.BOLD)
                                             .styled(style -> style
-                                                    .withClickEvent(new ClickEvent.OpenUrl("https://codeforces.com/profile/" + handle))
+                                                    .withClickEvent(new ClickEvent.OpenUrl(URI.create("https://codeforces.com/profile/" + handle)))
                                                     .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click để xem profile")))));
 
                             player.sendMessage(successMsg, false);
