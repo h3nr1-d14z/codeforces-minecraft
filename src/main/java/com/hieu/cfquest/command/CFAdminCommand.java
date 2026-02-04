@@ -34,8 +34,8 @@ public class CFAdminCommand {
                 return false;
             }
 
-            // Check if player is operator
-            return source.getServer().getPlayerManager().isOperator(player.getGameProfile());
+            // Check operator list contains player name
+            return source.getServer().getPlayerManager().getOpList().get(player.getGameProfile()) != null;
         } catch (Exception e) {
             // If any reflection/method error, fallback to console-only
             CFQuestMod.LOGGER.debug("Permission check failed: {}", e.getMessage());

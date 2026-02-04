@@ -149,7 +149,7 @@ public class CFLinkCommand {
                     .append(Text.literal(data.getCfHandle())
                             .formatted(Formatting.AQUA, Formatting.BOLD)
                             .styled(style -> style
-                                    .withClickEvent(new ClickEvent.OpenUrl("https://codeforces.com/profile/" + data.getCfHandle()))
+                                    .withClickEvent(new ClickEvent.OpenUrl(URI.create("https://codeforces.com/profile/" + data.getCfHandle())))
                                     .withHoverEvent(new HoverEvent.ShowText(Text.literal("Click để xem profile")))));
             player.sendMessage(linkStatus, false);
         } else {
