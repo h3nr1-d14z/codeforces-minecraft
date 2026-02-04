@@ -5,8 +5,11 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 env:
-  MINECRAFT_VERSION: 1.21.1
+  MINECRAFT_VERSION: 1.21.11
   JAVA_VERSION: 21
 
 jobs:
